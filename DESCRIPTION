@@ -4,8 +4,9 @@ Title: Advanced Methods for Randomized Experiments with Covariate Balance
 Version: 1.0.0
 Author: Your Name
 Maintainer: Your Name <your.email@example.com>
-Description: Implementation of HCM-ReR (Hierarchical Clustering Matched Re-Randomization) 
-    and PWD-ReR (Principal component Weighted Distance Re-Randomization) methods for 
+Description: Implementation of HCM (Hierarchical Clustering Matched), 
+    HCM-ReR (Hierarchical Clustering Matched Re-Randomization), and 
+    PWD-ReR (Principal component Weighted Distance Re-Randomization) methods for 
     generating balanced treatment allocations in randomized experiments. These methods 
     improve covariate balance while maintaining the randomization principle.
 License: MIT + file LICENSE
@@ -19,6 +20,9 @@ Imports:
 Suggests: 
     ggplot2,
     dplyr,
+    reshape2,
+    RColorBrewer,
+    gridExtra,
     testthat,
     knitr,
     rmarkdown

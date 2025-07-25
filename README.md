@@ -13,10 +13,7 @@ This R package implements three advanced methods for generating balanced treatme
 
 ```r
 # Install from GitHub
-devtools::install_github("yourusername/randomized-experiments")
-
-# Or install locally
-devtools::install()
+devtools::install_github("yourusername/randomized-experiments-main")
 
 library(randomizedexperiments)
 

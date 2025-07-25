@@ -18,8 +18,6 @@ devtools::install_github("yourusername/randomized-experiments")
 # Or install locally
 devtools::install()
 
-Quick Start
-
 library(randomizedexperiments)
 
 # Generate example data

@@ -2,10 +2,12 @@
 
 export(generate_covariates)
 export(generate_response)
+export(hcm)
 export(hcm_rer)
 export(pwd_rer)
 export(evaluate_allocation)
 export(calculate_balance_metrics)
+export(compare_methods)
 importFrom(MASS, mvrnorm)
 importFrom(MASS, ginv)
 importFrom(stats, dist)

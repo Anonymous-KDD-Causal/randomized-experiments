@@ -5,8 +5,8 @@
 
 This R package implements three advanced methods for generating balanced treatment allocations in randomized experiments:
 
-- **HCM**: Hierarchical Clustering Matched - Basic pair-based randomization using hierarchical clustering
-- **HCM-ReR**: Hierarchical Clustering Matched Re-Randomization - Enhanced HCM with PCA weighting and re-randomization
+- **HCM**: Hierarchical Clustering Matching - Basic pair-based randomization using hierarchical clustering
+- **HCM-ReR**: Hierarchical Clustering Matching Re-Randomization - An enhanced version of HCM. It uses hierarchical clustering to form pairs and re-randomizes treatment assignments within pairs 
 - **PWD-ReR**: Principal Component Weighted Distance Re-Randomization - Complete re-randomization with PCA-weighted balance criteria
 
 ## Installation

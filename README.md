@@ -14,7 +14,7 @@ The Real Data Analysis can be found in the real_data_analysis.R
 ## Citation
 If you use this package in your research, please cite:
 
-@software{randomizationmethods2025,
+@software{hcmrer2025,
   title = {Hierarchical Clustering Matching and Rerandomization for Causality},
   author = {Anonymous},
   journal = {KDD2026}

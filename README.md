@@ -11,6 +11,18 @@ This R package implements three advanced methods for generating balanced treatme
 
 The Real Data Analysis can be found in the real_data_analysis.R
 
+## Citation
+If you use this package in your research, please cite:
+
+@software{randomizationmethods2025,
+  title = {Hierarchical Clustering Matching and Rerandomization for Causality},
+  author = {Anonymous},
+  journal = {KDD2026}
+  year = {2025},
+  url = {https://github.com/yourusername/randomization-methods},
+  version = {1.0.0}
+}
+
 ## Installation
 
 ```r

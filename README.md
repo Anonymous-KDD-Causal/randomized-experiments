@@ -18,7 +18,7 @@ The Real Data Analysis can be found in the real_data_analysis.R
 devtools::install_github("yourusername/randomized-experiments-main")
 
 # Quick Start
-
+setwd('your_working_directory/randomized-experiments-main')
 source("R/hcm.R")
 source("R/hcm_rer.R")
 source("R/pwd_rer.R")

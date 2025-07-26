@@ -106,4 +106,8 @@ results_table[numeric_cols] <- round(results_table[numeric_cols], 4)
 cat("=== METHOD RESULTS TABLE ===\n")
 print(results_table, row.names = FALSE)
 
-
+# Demo results
+#  Method Mahalanobis_Distance Max_SMD Mean_SMD  Balance_Score True_Tau Estimated_Tau    Bias Abs_Bias
+#     HCM              39.1263  0.2758   0.0798           0.72        1        1.0706  0.0706   0.0706
+# HCM-ReR              27.5974  0.2165   0.0613           0.74        1        0.9569 -0.0431   0.0431
+# PWD-ReR              39.7562  0.2981   0.0832           0.60        1        0.7704 -0.2296   0.2296

@@ -17,11 +17,10 @@ If you use this package in your research, please cite:
 @software{hcmrer2025,
   title = {Hierarchical Clustering Matching and Rerandomization for Causality},
   author = {Anonymous},
-  journal = {KDD2026}
+  journal = {KDD2026},
   year = {2025},
   url = {https://github.com/yourusername/randomization-methods},
-  version = {1.0.0}
-}
+  version = {1.0.0}}
 
 ## Installation
 

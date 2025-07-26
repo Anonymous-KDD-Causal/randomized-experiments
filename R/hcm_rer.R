@@ -1,61 +1,63 @@
-#' HCM_ReR: Hierarchical Clustering Matched Re-Randomization
-#'
-#' Implements the HCM_ReR method, which uses hierarchical clustering to form matched pairs.
-#' Treatment assignments are re-randomized within these pairs to achieve excellent covariate balance 
-#' based on the Mahalanobis distance. 
-#'
-#' @param pa Acceptance probability threshold for the Mahalanobis distance (default: 0.2)
-#' @param X Covariate matrix (n x p), must have an even number of rows
-#' @param n_budget Maximum number of re-randomization attempts (default: 1000)
-#' @param seed Random seed for reproducibility (default: 2020)
-#'
-#' @return A list containing:
-#' \item{allocation}{Treatment allocation vector (0/1)}
-#' \item{iterations}{Number of iterations until acceptance}
-#' \item{indicator}{Indicator of whether the allocation met the balance criterion (`FALSE` if accepted, `TRUE` if not accepted)}
-#' \item{a}{Acceptance threshold for the Mahalanobis distance}
-#' \item{matched_pairs}{List of matched pairs information (indices, distances, etc.)}
-#' \item{n_matched_pairs}{Number of matched pairs created}
-#' \item{n_matched_units}{Number of units successfully matched into pairs}
-#' \item{balance_history}{History of Mahalanobis distances across iterations}
-#'
-#' @details 
-#' The `HCM_ReR` method works as follows:
-#' 1. **Hierarchical Clustering**: Performs hierarchical clustering on the covariate matrix (`X`) to form matched pairs.
-#' 2. **Re-Randomization**: Treatment assignments are randomized within pairs.
-#' 3. **Balance Evaluation**: The Mahalanobis distance is calculated for each allocation, and allocations are accepted if the distance is below a threshold determined by the chi-squared distribution.
-#' 4. **Stopping Criterion**: The algorithm stops when an allocation is accepted or the maximum number of iterations (`n_budget`) is reached.
-#'
-#' The acceptance threshold (`a`) is derived from the chi-squared distribution with degrees of freedom equal to the number of covariates (`p`).
-#'
-#' @examples
-#' # Generate example covariate data
-#' X <- generate_covariates(n = 100, p = 5, rho = 0.3, seed = 123)
+#' Hierarchical Clustering Rerandomization (HCM-ReR)
 #' 
-#' # Run HCM_ReR
-#' result <- HCM_ReR(pa = 0.1, X = X, n_budget = 500, seed = 123)
+#' Implementation of Hierarchical Clustering with Rerandomization.
+#' This method first creates matched pairs using hierarchical clustering,
+#' then applies rerandomization within the pair structure to achieve
+#' better covariate balance.
+#' 
+#' @author Your Name
+#' @version 1.0.0
+
+source("R/utils.R")
+
+#' Hierarchical Clustering Rerandomization
+#'
+#' Combines hierarchical clustering matching with rerandomization.
+#' First creates pairs using hierarchical clustering, then rerandomizes
+#' treatment assignments within pairs until achieving acceptable balance.
+#'
+#' @param X Covariate matrix (n x p). Must have even number of rows.
+#' @param pa Acceptance probability for rerandomization (default: 0.2)
+#' @param n_budget Maximum number of rerandomization attempts (default: 1000)
+#' @param linkage Clustering linkage method (default: "single")
+#' @param seed Random seed for reproducibility (default: 2020)
+#' @return List containing:
+#'   \item{allocation}{Treatment allocation vector (0/1)}
+#'   \item{matched_pairs}{List of matched pair information}
+#'   \item{n_matched_pairs}{Number of matched pairs created}
+#'   \item{iterations}{Number of rerandomization iterations used}
+#'   \item{threshold}{Mahalanobis distance threshold used}
+#'   \item{final_balance}{Final achieved balance}
+#'   \item{converged}{Whether the algorithm converged within budget}
+#' @export
+#' @examples
+#' # Generate data
+#' X <- generate_covariates(d = 5, rho = 0.3, n = 100, seed = 123)
+#' 
+#' # Apply HCM-ReR
+#' result <- hcm_rer(X, pa = 0.1, n_budget = 500, seed = 123)
 #' 
 #' # Check results
-#' print(paste("Accepted:", !result$indicator))
-#' print(paste("Iterations:", result$iterations))
-#' print(paste("Final Mahalanobis Distance:", round(result$balance_history[result$iterations], 4)))
-#'
-#' @export
-#' @importFrom stats dist hclust
-#' 
-hcm_rer <- function(pa, X, n_budget = 1000, seed = 2020) {
+#' cat("Converged:", result$converged, "\n")
+#' cat("Iterations:", result$iterations, "\n")
+#' cat("Final balance:", result$final_balance, "\n")
+hcm_rer <- function(X, pa = 0.2, n_budget = 1000, linkage = "single", seed = 2020) {
   set.seed(seed)
+  
   n <- nrow(X)
   d <- ncol(X)
-  a <- qchisq(pa, d)
   
+  # Check for even sample size
   if (n %% 2 != 0) {
-    stop("Sample size must be even for pair-based methods")
+    stop("Sample size must be even for pair-based methods. Current n = ", n)
   }
   
-  # Hierarchical clustering pairing (learning from hcm_randomized)
+  # Set threshold using chi-squared distribution
+  threshold <- qchisq(pa, d)
+  
+  # Step 1: Create pairs using hierarchical clustering
   dist_mat <- dist(X, method = "euclidean")
-  hc_tree <- hclust(dist_mat, method = "single")
+  hc_tree <- hclust(dist_mat, method = linkage)
   
   # Extract pairs from hierarchical clustering
   pairs <- list()
@@ -66,7 +68,7 @@ hcm_rer <- function(pa, X, n_budget = 1000, seed = 2020) {
   for (i in 1:nrow(hc_tree$merge)) {
     merge_row <- hc_tree$merge[i, ]
     
-    # Get actual indices
+    # Get actual indices (negative values indicate original points)
     idx1 <- if (merge_row[1] < 0) abs(merge_row[1]) else NULL
     idx2 <- if (merge_row[2] < 0) abs(merge_row[2]) else NULL
     
@@ -91,39 +93,111 @@ hcm_rer <- function(pa, X, n_budget = 1000, seed = 2020) {
     }
   }
   
-  best_w <- NULL
-  best_mdist <- Inf
+  # Step 2: Rerandomization within pairs
+  best_allocation <- NULL
+  best_balance <- Inf
   balance_history <- numeric()
   
   for (iter in 1:n_budget) {
-    w <- generate_allocation_from_pairs(pairs, n)
-    mdist <- maha_dist(X, w)
+    # Generate allocation from pairs
+    allocation <- generate_allocation_from_pairs(pairs, n)
     
-    balance_history <- c(balance_history, mdist)
+    # Calculate balance
+    current_balance <- maha_dist(X, allocation)
+    balance_history <- c(balance_history, current_balance)
     
-    if (mdist < best_mdist) {
-      best_w <- w
-      best_mdist <- mdist
+    if (current_balance < best_balance) {
+      best_allocation <- allocation
+      best_balance <- current_balance
     }
     
-    if (mdist <= a) {
-      matched_pairs_info <- convert_pairs_to_matched_format(pairs, w, X)
+    # Check if threshold is met
+    if (current_balance <= threshold) {
+      # Convert pairs to matched pair format
+      matched_pairs <- list()
+      for (i in 1:length(pairs)) {
+        pair_indices <- pairs[[i]]
+        if (length(pair_indices) == 2) {
+          treatments <- allocation[pair_indices]
+          pair_distance <- as.numeric(dist(X[pair_indices, ]))
+          
+          matched_pairs[[i]] <- list(
+            indices = pair_indices,
+            treatments = treatments,
+            distance = pair_distance
+          )
+        }
+      }
+      
       return(list(
-        allocation = w, w = w, ii = iter, indicator = FALSE, a = a,
-        matched_pairs = matched_pairs_info$matched_pairs,
-        n_matched_pairs = matched_pairs_info$n_matched_pairs,
-        n_matched_units = matched_pairs_info$n_matched_units,
-        iterations = iter, balance_history = balance_history
+        allocation = allocation,
+        matched_pairs = matched_pairs,
+        n_matched_pairs = length(matched_pairs),
+        n_matched_units = length(matched_pairs) * 2,
+        iterations = iter,
+        threshold = threshold,
+        final_balance = current_balance,
+        converged = TRUE,
+        balance_history = balance_history,
+        method = "HCM-ReR"
       ))
     }
   }
   
-  matched_pairs_info <- convert_pairs_to_matched_format(pairs, best_w, X)
+  # If no allocation met threshold, return best found
+  matched_pairs <- list()
+  for (i in 1:length(pairs)) {
+    pair_indices <- pairs[[i]]
+    if (length(pair_indices) == 2) {
+      treatments <- best_allocation[pair_indices]
+      pair_distance <- as.numeric(dist(X[pair_indices, ]))
+      
+      matched_pairs[[i]] <- list(
+        indices = pair_indices,
+        treatments = treatments,
+        distance = pair_distance
+      )
+    }
+  }
+  
   return(list(
-    allocation = best_w, w = best_w, ii = n_budget, indicator = TRUE, a = a,
-    matched_pairs = matched_pairs_info$matched_pairs,
-    n_matched_pairs = matched_pairs_info$n_matched_pairs,
-    n_matched_units = matched_pairs_info$n_matched_units,
-    iterations = n_budget, balance_history = balance_history
+    allocation = best_allocation,
+    matched_pairs = matched_pairs,
+    n_matched_pairs = length(matched_pairs),
+    n_matched_units = length(matched_pairs) * 2,
+    iterations = n_budget,
+    threshold = threshold,
+    final_balance = best_balance,
+    converged = FALSE,
+    balance_history = balance_history,
+    method = "HCM-ReR"
+  ))
+}
+
+#' Evaluate HCM-ReR Results
+#'
+#' @param X Covariate matrix
+#' @param hcm_rer_result Result from hcm_rer() function
+#' @return List of evaluation metrics
+#' @export
+evaluate_hcm_rer <- function(X, hcm_rer_result) {
+  allocation <- hcm_rer_result$allocation
+  
+  # Calculate balance metrics
+  maha_distance <- maha_dist(X, allocation)
+  smd_values <- calc_smd(X, allocation)
+  
+  # Calculate pair distances
+  pair_distances <- sapply(hcm_rer_result$matched_pairs, function(p) p$distance)
+  
+  return(list(
+    mahalanobis_distance = maha_distance,
+    max_smd = max(abs(smd_values), na.rm = TRUE),
+    mean_smd = mean(abs(smd_values), na.rm = TRUE),
+    balance_score = mean(abs(smd_values) < 0.1, na.rm = TRUE),
+    mean_pair_distance = mean(pair_distances),
+    median_pair_distance = median(pair_distances),
+    convergence_rate = hcm_rer_result$converged,
+    efficiency = hcm_rer_result$iterations / max(hcm_rer_result$balance_history, na.rm = TRUE)
   ))
 }

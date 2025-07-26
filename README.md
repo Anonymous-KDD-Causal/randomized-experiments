@@ -9,6 +9,8 @@ This R package implements three advanced methods for generating balanced treatme
 - **HCM-ReR**: Hierarchical Clustering Matching Re-Randomization - An enhanced version of HCM. It uses hierarchical clustering to form pairs and re-randomizes treatment assignments within pairs 
 - **PWD-ReR**: Principal Component Weighted Distance Re-Randomization - Complete re-randomization with PCA-weighted balance criteria
 
+The Real Data Analysis can be found in the real_data_analysis.R
+
 ## Installation
 
 ```r

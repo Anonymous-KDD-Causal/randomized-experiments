@@ -4,7 +4,6 @@
 #' This method uses PCA to weight variables by their importance and applies
 #' rerandomization using a weighted balance criterion.
 #' 
-#' @author Your Name
 #' @version 1.0.0
 
 source("R/utils.R")

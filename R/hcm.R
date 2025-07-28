@@ -4,7 +4,6 @@
 #' This method creates matched pairs using hierarchical clustering and then
 #' randomly assigns treatments within each pair.
 #' 
-#' @author Your Name
 #' @version 1.0.0
 
 source("R/utils.R")

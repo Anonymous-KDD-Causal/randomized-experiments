@@ -2,7 +2,6 @@
 #' 
 #' This file contains helper functions used across different experimental design methods.
 #' 
-#' @author Your Name
 #' @version 1.0.0
 
 # Load required libraries

@@ -5,7 +5,6 @@
 #' then applies rerandomization within the pair structure to achieve
 #' better covariate balance.
 #' 
-#' @author Your Name
 #' @version 1.0.0
 
 source("R/utils.R")

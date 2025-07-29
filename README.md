@@ -19,7 +19,7 @@ If you use this package in your research, please cite:
   author = {Anonymous},
   journal = {KDD2026},
   year = {2025},
-  url = {https://github.com/yourusername/randomization-methods},
+  url = {[https://github.com/yourusername/randomization-methods](https://github.com/Anonymous-KDD-Causal/randomized-experiments/)},
   version = {1.0.0}}
 
 ## Installation

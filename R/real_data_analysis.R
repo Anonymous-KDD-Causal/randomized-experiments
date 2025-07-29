@@ -1,5 +1,6 @@
 # ============================================================================
 # ENHANCED RANDOMIZATION METHODS COMPARISON ON REAL-WORLD DATA
+# Complete Study with Selected Methods Only
 # ============================================================================
 
 library(glmnet)
@@ -209,148 +210,20 @@ convert_pairs_to_matched_format <- function(pairs, allocation, X) {
 # HIERARCHICAL CLUSTERING MATCHING (HCM)
 # ============================================================================
 
-hcm_randomized <- function(X, seed = 2020) {
+hcm_randomized <- function(X, linkage = "single", seed = 2020) {
   set.seed(seed)
-  n <- nrow(X)
-  original_indices <- 1:n
   
-  matched_pairs <- list()
-  pair_count <- 0
-  
-  working_data <- X
-  working_indices <- original_indices
-  
-  while (nrow(working_data) >= 2) {
-    if (nrow(working_data) == 2) {
-      pair_count <- pair_count + 1
-      treatment_assignment <- sample(c(0, 1), 2, replace = FALSE)
-      
-      matched_pairs[[pair_count]] <- list(
-        indices = working_indices,
-        treatments = treatment_assignment,
-        distance = as.matrix(dist(working_data))[1, 2]
-      )
-      break
-    }
-    
-    # Build hierarchical clustering tree
-    dist_mat <- dist(working_data, method = "euclidean")
-    hc_tree <- hclust(dist_mat, method = "single")
-    
-    # Find the closest pair
-    first_merge <- hc_tree$merge[1, ]
-    
-    if (first_merge[1] < 0) {
-      idx1 <- abs(first_merge[1])
-    } else {
-      idx1 <- 1
-    }
-    
-    if (first_merge[2] < 0) {
-      idx2 <- abs(first_merge[2])
-    } else {
-      idx2 <- 2
-    }
-    
-    if (idx1 > nrow(working_data)) idx1 <- 1
-    if (idx2 > nrow(working_data)) idx2 <- 2
-    if (idx1 == idx2) idx2 <- min(idx1 + 1, nrow(working_data))
-    
-    pair_count <- pair_count + 1
-    treatment_assignment <- sample(c(0, 1), 2, replace = FALSE)
-    pair_distance <- as.matrix(dist_mat)[idx1, idx2]
-    
-    matched_pairs[[pair_count]] <- list(
-      indices = working_indices[c(idx1, idx2)],
-      treatments = treatment_assignment,
-      distance = pair_distance
-    )
-    
-    remove_indices <- c(idx1, idx2)
-    working_data <- working_data[-remove_indices, , drop = FALSE]
-    working_indices <- working_indices[-remove_indices]
-  }
-  
-  allocation <- rep(NA, n)
-  
-  for (i in 1:pair_count) {
-    pair_info <- matched_pairs[[i]]
-    allocation[pair_info$indices] <- pair_info$treatments
-  }
-  
-  unmatched <- which(is.na(allocation))
-  if (length(unmatched) > 0) {
-    allocation[unmatched] <- sample(c(0, 1), length(unmatched), replace = TRUE)
-  }
-  
-  return(list(
-    allocation = allocation,
-    matched_pairs = matched_pairs,
-    n_matched_pairs = pair_count,
-    n_matched_units = pair_count * 2,
-    iterations = 1
-  ))
-}
-
-# ============================================================================
-# HCM-ReR
-# ============================================================================
-
-HCM_ReR <- function(pa, X, var_explained = 0.7, n_budget = 1000, 
-                    seed = 2020, n_sim_threshold = 500) {
-  set.seed(seed)
   n <- nrow(X)
   d <- ncol(X)
   
+  # Check for even sample size
   if (n %% 2 != 0) {
-    stop("Sample size must be even for pair-based methods")
+    stop("Sample size must be even for pair-based methods. Current n = ", n)
   }
   
-  # Step 1: Calculate PCA weights
-  X_svd <- svd(X)
-  
-  if (var_explained == 'Kaiser') {
-    k <- sum(X_svd$d^2 > mean(X_svd$d^2))
-  } else {
-    cumsum_vars <- cumsum(X_svd$d^2)
-    cumsum_vars <- cumsum_vars / cumsum_vars[length(cumsum_vars)]
-    k <- sum(cumsum_vars < var_explained) + 1
-  }
-  
-  rotation <- X_svd$v[, 1:k, drop = FALSE]
-  if (k == 1) {
-    var_weights <- rotation^2
-  } else {
-    var_weights <- rowSums(rotation^2)
-  }
-  var_weights <- var_weights / sum(var_weights)
-  
-  # Step 2: Weighted balance metric
-  calc_weighted_balance <- function(X, W, weights) {
-    n1 <- sum(W)
-    n0 <- sum(1-W)
-    if (n1 == 0 || n0 == 0) return(Inf)
-    
-    X_std <- scale(X)
-    mean_diff <- colMeans(X_std[W == 1, , drop = FALSE]) - 
-      colMeans(X_std[W == 0, , drop = FALSE])
-    sum(weights * mean_diff^2)
-  }
-  
-  # Step 3: Simulate threshold using weighted metric
-  sim_distances <- replicate(n_sim_threshold, {
-    W_sim <- sample(c(rep(1, n/2), rep(0, n/2)))
-    calc_weighted_balance(X, W_sim, var_weights)
-  })
-  threshold <- quantile(sim_distances, pa, na.rm = TRUE)
-  
-  # Step 4: Create pairs using hierarchical clustering in weighted space
-  X_std <- scale(X)
-  weighted_X_std <- sweep(X_std, 2, sqrt(var_weights), "*")
-  
-  # Hierarchical clustering pairing in weighted space
-  dist_mat <- dist(weighted_X_std, method = "euclidean")
-  hc_tree <- hclust(dist_mat, method = "single")
+  # Step 1: Create pairs using hierarchical clustering
+  dist_mat <- dist(X, method = "euclidean")
+  hc_tree <- hclust(dist_mat, method = linkage)
   
   # Extract pairs from hierarchical clustering
   pairs <- list()
@@ -361,7 +234,7 @@ HCM_ReR <- function(pa, X, var_explained = 0.7, n_budget = 1000,
   for (i in 1:nrow(hc_tree$merge)) {
     merge_row <- hc_tree$merge[i, ]
     
-    # Get actual indices
+    # Get actual indices (negative values indicate original points)
     idx1 <- if (merge_row[1] < 0) abs(merge_row[1]) else NULL
     idx2 <- if (merge_row[2] < 0) abs(merge_row[2]) else NULL
     
@@ -376,58 +249,174 @@ HCM_ReR <- function(pa, X, var_explained = 0.7, n_budget = 1000,
     }
   }
   
-  # Handle remaining unpaired units with greedy pairing in weighted space
+  # Handle remaining unpaired units with greedy pairing
   remaining <- which(!used_indices)
   if (length(remaining) >= 2) {
-    remaining_pairs <- create_greedy_pairs(weighted_X_std[remaining, , drop = FALSE])
+    remaining_pairs <- create_greedy_pairs(X[remaining, , drop = FALSE])
     for (i in seq_along(remaining_pairs)) {
       pair_count <- pair_count + 1
       pairs[[pair_count]] <- remaining[remaining_pairs[[i]]]
     }
   }
   
-  # Step 5: Rerandomization within pairs using weighted balance metric
-  best_w <- NULL
-  best_balance <- Inf
-  balance_history <- numeric()
+  # Step 2: Generate single allocation from pairs
+  allocation <- generate_allocation_from_pairs(pairs, n)
   
-  for (iter in 1:n_budget) {
-    w <- generate_allocation_from_pairs(pairs, n)
-    # Evaluate using weighted balance metric
-    balance_score <- calc_weighted_balance(X, w, var_weights)
-    
-    balance_history <- c(balance_history, balance_score)
-    
-    if (balance_score < best_balance) {
-      best_w <- w
-      best_balance <- balance_score
-    }
-    
-    if (balance_score <= threshold) {
-      matched_pairs_info <- convert_pairs_to_matched_format(pairs, w, X)
-      return(list(
-        allocation = w, w = w, ii = iter, indicator = FALSE, 
-        a = threshold, k = k,
-        matched_pairs = matched_pairs_info$matched_pairs,
-        n_matched_pairs = matched_pairs_info$n_matched_pairs,
-        n_matched_units = matched_pairs_info$n_matched_units,
-        iterations = iter, balance_history = balance_history
-      ))
+  # Calculate balance
+  final_balance <- maha_dist(X, allocation)
+  
+  # Convert pairs to matched pair format
+  matched_pairs <- list()
+  for (i in 1:length(pairs)) {
+    pair_indices <- pairs[[i]]
+    if (length(pair_indices) == 2) {
+      treatments <- allocation[pair_indices]
+      pair_distance <- as.numeric(dist(X[pair_indices, ]))
+      
+      matched_pairs[[i]] <- list(
+        indices = pair_indices,
+        treatments = treatments,
+        distance = pair_distance
+      )
     }
   }
   
-  # Return best allocation if threshold not met
-  matched_pairs_info <- convert_pairs_to_matched_format(pairs, best_w, X)
   return(list(
-    allocation = best_w, w = best_w, ii = n_budget, indicator = TRUE, 
-    a = threshold, k = k,
-    matched_pairs = matched_pairs_info$matched_pairs,
-    n_matched_pairs = matched_pairs_info$n_matched_pairs,
-    n_matched_units = matched_pairs_info$n_matched_units,
-    iterations = n_budget, balance_history = balance_history
+    allocation = allocation,
+    matched_pairs = matched_pairs,
+    n_matched_pairs = length(matched_pairs),
+    n_matched_units = length(matched_pairs) * 2,
+    iterations = 1
   ))
 }
 
+# ============================================================================
+# HCM-ReR METHOD
+# ============================================================================
+
+HCM_ReR <- function(X, pa = 0.2, n_budget = 1000, linkage = "single", seed = 2020) {
+  set.seed(seed)
+  
+  n <- nrow(X)
+  d <- ncol(X)
+  
+  # Check for even sample size
+  if (n %% 2 != 0) {
+    stop("Sample size must be even for pair-based methods. Current n = ", n)
+  }
+  
+  # Step 1: Create pairs using hierarchical clustering
+  dist_mat <- dist(X, method = "euclidean")
+  hc_tree <- hclust(dist_mat, method = linkage)
+  
+  # Extract pairs from hierarchical clustering
+  pairs <- list()
+  used_indices <- logical(n)
+  pair_count <- 0
+  
+  # Process merges to create pairs
+  for (i in 1:nrow(hc_tree$merge)) {
+    merge_row <- hc_tree$merge[i, ]
+    
+    # Get actual indices (negative values indicate original points)
+    idx1 <- if (merge_row[1] < 0) abs(merge_row[1]) else NULL
+    idx2 <- if (merge_row[2] < 0) abs(merge_row[2]) else NULL
+    
+    # If both are original points and neither is used
+    if (!is.null(idx1) && !is.null(idx2) && 
+        !used_indices[idx1] && !used_indices[idx2]) {
+      pair_count <- pair_count + 1
+      pairs[[pair_count]] <- c(idx1, idx2)
+      used_indices[c(idx1, idx2)] <- TRUE
+      
+      if (pair_count >= n/2) break
+    }
+  }
+  
+  # Handle remaining unpaired units with greedy pairing
+  remaining <- which(!used_indices)
+  if (length(remaining) >= 2) {
+    remaining_pairs <- create_greedy_pairs(X[remaining, , drop = FALSE])
+    for (i in seq_along(remaining_pairs)) {
+      pair_count <- pair_count + 1
+      pairs[[pair_count]] <- remaining[remaining_pairs[[i]]]
+    }
+  }
+  
+  library(parallel)
+  library(MASS)
+  
+  # Windows-compatible parallel processing
+  n_cores <- detectCores() - 1
+  cl <- makeCluster(n_cores)
+  
+  # Export all necessary functions and objects
+  clusterExport(cl, c("generate_allocation_from_pairs", "maha_dist", "pairs", "X", "n",
+                      "create_greedy_pairs"))  # Add any other helper functions used
+  
+  # Load required libraries on each worker
+  clusterEvalQ(cl, {
+    library(MASS)
+  })
+  
+  sim_distances <- parSapply(cl, 1:400, function(i) {
+    allocation_sim <- generate_allocation_from_pairs(pairs, n)
+    maha_dist(X, allocation_sim)
+  })
+  
+  stopCluster(cl)
+  threshold <- quantile(sim_distances, pa, na.rm = TRUE)
+  
+  # Step 2: Rerandomization within pairs
+  best_allocation <- NULL
+  best_balance <- Inf
+  iterations_used <- n_budget
+  
+  for (iter in 1:n_budget) {
+    # Generate allocation from pairs
+    print(iter)
+    allocation <- generate_allocation_from_pairs(pairs, n)
+    
+    # Calculate balance
+    current_balance <- maha_dist(X, allocation)
+    
+    if (current_balance < best_balance) {
+      best_allocation <- allocation
+      best_balance <- current_balance
+    }
+    
+    # Check if threshold is met
+    if (current_balance <= threshold) {
+      iterations_used <- iter
+      best_allocation <- allocation
+      break
+    }
+  }
+  
+  # Convert pairs to matched pair format using final allocation
+  matched_pairs <- list()
+  for (i in 1:length(pairs)) {
+    pair_indices <- pairs[[i]]
+    if (length(pair_indices) == 2) {
+      treatments <- best_allocation[pair_indices]
+      pair_distance <- as.numeric(dist(X[pair_indices, ]))
+      
+      matched_pairs[[i]] <- list(
+        indices = pair_indices,
+        treatments = treatments,
+        distance = pair_distance
+      )
+    }
+  }
+  
+  return(list(
+    allocation = best_allocation,
+    matched_pairs = matched_pairs,
+    n_matched_pairs = pair_count,
+    n_matched_units = pair_count * 2,
+    iterations = iterations_used
+  ))
+}
 # ============================================================================
 # RERANDOMIZATION METHODS
 # ============================================================================
@@ -803,7 +792,6 @@ PWD_ReR <- function(pa, X, var_explained = 0.7, n_budget = 1000,
     iterations = n_budget
   ))
 }
-
 # ============================================================================
 # REAL IHDP DATA LOADING AND PREPROCESSING
 # Based on the provided CEVAE repository approach
@@ -1030,7 +1018,7 @@ if (!file.exists(save_dir_hcm)) {
     result <- hcm_randomized(X, seed = 2020 + i)
     ii_vec_hcm <- c(ii_vec_hcm, result$iterations)
     W_hcm <- cbind(W_hcm, as.numeric(result$allocation))
-    if (i %% 100 == 0) cat("Completed", i, "replications\n")
+    if (i %% 10 == 0) cat("Completed", i, "replications\n")
   }
   end_time <- Sys.time()
   time_hcm <- as.numeric(difftime(end_time, start_time, units = "secs"))
@@ -1040,7 +1028,7 @@ if (!file.exists(save_dir_hcm)) {
   load(file = save_dir_hcm)
 }
 
-# Method 7: HCM-ReR (FORMERLY PWD_HCM_NPR)
+# Method 7: HCM-ReR
 cat("Running HCM-ReR...\n")
 save_dir_hcm_rer <- file.path(save_dir_folder, 'hcm_rer.rdata')
 if (!file.exists(save_dir_hcm_rer)) {
@@ -1050,11 +1038,13 @@ if (!file.exists(save_dir_hcm_rer)) {
   
   start_time <- Sys.time()
   for (i in 1:reps) {
-    result <- HCM_ReR(pa = pa, X = X, var_explained = var_ratio,
-                      n_budget = n_budget, seed = 2020 + i)
-    ii_vec_hcm_rer <- c(ii_vec_hcm_rer, result$ii)
-    W_hcm_rer <- cbind(W_hcm_rer, as.numeric(result$w))
-    if (i %% 100 == 0) cat("Completed", i, "replications\n")
+    result <- HCM_ReR(pa = pa, X = X, n_budget = n_budget, seed = 2020 + i)
+    
+    # Fix: Use correct element names
+    ii_vec_hcm_rer <- c(ii_vec_hcm_rer, result$iterations)  # Changed from result$ii
+    W_hcm_rer <- cbind(W_hcm_rer, as.numeric(result$allocation))  # Changed from result$w
+    
+    if (i %% 1 == 0) cat("Completed", i, "replications\n")  # Changed to every 100 for less output
   }
   end_time <- Sys.time()
   time_hcm_rer <- as.numeric(difftime(end_time, start_time, units = "secs"))
@@ -1063,10 +1053,6 @@ if (!file.exists(save_dir_hcm_rer)) {
 } else {
   load(file = save_dir_hcm_rer)
 }
-
-W_hcm_rer = W_hcm_npr
-time_hcm_rer = time_hcm_npr
-ii_vec_hcm_rer= ii_vec_hcm_npr
 
 # ============================================================================
 # ANALYSIS AND RESULTS
@@ -1165,15 +1151,6 @@ mean_smd_pwdrer <- calculate_mean_abs_smd(W_pwdrer, X)
 mean_smd_hcm <- calculate_mean_abs_smd(W_hcm, X)
 mean_smd_hcm_rer <- calculate_mean_abs_smd(W_hcm_rer, X)
 
-# Calculate mean SMD
-# mean_smd_simple <- mean(abs(apply(W_simple, MARGIN = 2, FUN = smd, X = X)))
-# mean_smd_rer <- mean(abs(apply(W_rer, MARGIN = 2, FUN = smd, X = X)))
-# mean_smd_ridgerer <- mean(abs(apply(W_ridgerer, MARGIN = 2, FUN = smd, X = X)))
-# mean_smd_pcarer <- mean(abs(apply(W_pcarer, MARGIN = 2, FUN = smd, X = X)))
-# mean_smd_pwdrer <- mean(abs(apply(W_pwdrer, MARGIN = 2, FUN = smd, X = X)))
-# mean_smd_hcm <- mean(abs(apply(W_hcm, MARGIN = 2, FUN = smd, X = X)))
-# mean_smd_hcm_rer <- mean(abs(apply(W_hcm_rer, MARGIN = 2, FUN = smd, X = X)))
-
 # Create results table with requested columns only
 results_table <- data.frame(
   Methods = c("Simple Randomization", "ReR", "RidgeReR", "PCA-ReR", "PWD-ReR", "HCM", "HCM-ReR"),
@@ -1216,12 +1193,30 @@ tau_density_plot <- ggplot(tau_df, aes(x = value, color = Methods, fill = Method
   geom_vline(aes(xintercept = tau_true), linetype = "dashed", color = "red") +
   xlab(TeX('$\\hat{\\tau}$')) +
   ylab('Density') +
-  ggtitle('Treatment Effect Estimation Distribution by Method') +
   theme_bw() +
   theme(legend.position = "bottom") +
   annotate("text", x = tau_true, y = Inf, label = "True Effect", 
-           vjust = 1.2, color = "red", size = 3)
+           vjust = 1.2, color = "red", size = 6)
+tau_density_plot <- ggplot(tau_df, aes(x = value, color = Methods, fill = Methods)) +
+  geom_density(alpha = 0.3) +
+  geom_vline(aes(xintercept = tau_true), linetype = "dashed", color = "red") +
+  xlab(TeX('$\\hat{\\tau}$')) +                  
+  ylab('Density') +                               
+  theme_bw() +
+  theme(
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20),
+    axis.text.x = element_text(size = 20),
+    axis.text.y = element_text(size = 20),
+    legend.position = "bottom",
+    legend.title = element_text(size = 20),
+    legend.text  = element_text(size = 20),
+    legend.key.size = unit(1, "cm")          
+  ) +
+  annotate("text", x = tau_true, y = Inf, label = "True Effect", 
+           vjust = 1.2, color = "red", size = 6)
 
+tau_density_plot
 print(tau_density_plot)
 
 # 2. Performance Comparison
@@ -1269,14 +1264,11 @@ print(tradeoff_plot)
 write.csv(results_table, 
           file = file.path(save_dir_folder, 'selected_methods_results.csv'), 
           row.names = FALSE)
-
 # Save plots
 ggsave(file.path(save_dir_folder, 'treatment_effect_distributions.pdf'),
        plot = tau_density_plot, width = 12, height = 8)
-
 ggsave(file.path(save_dir_folder, 'performance_comparison.pdf'),
        plot = performance_plot, width = 14, height = 10)
-
 ggsave(file.path(save_dir_folder, 'bias_balance_tradeoff.pdf'),
        plot = tradeoff_plot, width = 10, height = 8)
 
@@ -1320,7 +1312,7 @@ cat("\n=== STUDY COMPLETED SUCCESSFULLY ===\n")
 cat("Results saved to:", save_dir_folder, "\n")
 
 # ============================================================================
-# COVARIATE BALANCE HEATMAP (UPDATED FOR 7 METHODS)
+# COVARIATE BALANCE HEATMAP
 # ============================================================================
 
 # Calculate relative variance reduction for each method
@@ -1365,11 +1357,29 @@ plt_mdiff_heatmap <- levelplot(r_mdiff_plot,
                                  ),
                                  y = list(cex = 0.9)
                                ))
-
+plt_mdiff_heatmap <- levelplot(r_mdiff_plot,
+                               xlab = 'Covariates',
+                               ylab = 'Methods',
+                               aspect = 0.4,
+                               at = seq(0, 1, length.out = 21),
+                               scales = list(
+                                 x = list(
+                                   at = 1:n_covs_to_show,
+                                   labels = parse(text = x_labels_parse),
+                                   cex = 1.3
+                                 ),
+                                 y = list(
+                                   cex = 1.3
+                                 )
+                               ),
+                               colorkey = list(
+                                 labels = list(cex = 1.4)
+                               ),
+                               par.settings = list(
+                                 axis.title = list(cex = 1.6),
+                                 par.xlab.text = list(cex = 1.6),   
+                                 par.ylab.text = list(cex = 1.6),   
+                                 key.text = list(cex = 1.6),
+                                 key.title = list(cex = 1.4)
+                               ))
 print(plt_mdiff_heatmap)
-
-# Save the heatmap
-pdf(file.path(save_dir_folder, 'covariate_balance_heatmap_7methods.pdf'),
-    height = 6, width = 12)
-print(plt_mdiff_heatmap)
-dev.off()

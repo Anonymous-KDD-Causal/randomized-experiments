@@ -1,6 +1,5 @@
 # ============================================================================
-# ENHANCED RANDOMIZATION METHODS COMPARISON ON REAL-WORLD DATA
-# Complete Study with Selected Methods Only
+# RANDOMIZATION METHODS COMPARISON ON REAL-WORLD DATA
 # ============================================================================
 
 library(glmnet)

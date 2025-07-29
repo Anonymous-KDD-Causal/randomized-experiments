@@ -1,4 +1,4 @@
-#' Hierarchical Clustering Rerandomization (HCM-ReR)
+#' Hierarchical Clustering Matching Rerandomization (HCM-ReR)
 #' 
 #' Implementation of Hierarchical Clustering with Rerandomization.
 #' This method first creates matched pairs using hierarchical clustering,
@@ -9,7 +9,7 @@
 
 source("R/utils.R")
 
-#' Hierarchical Clustering Rerandomization
+#' Hierarchical Clustering Matching Rerandomization
 #'
 #' Combines hierarchical clustering matching with rerandomization.
 #' First creates pairs using hierarchical clustering, then rerandomizes

@@ -42,46 +42,46 @@ source("R/utils.R")
 #' cat("Final balance:", result$final_balance, "\n")
 hcm_rer <- function(X, pa = 0.2, n_budget = 1000, linkage = "single", seed = 2020) {
   set.seed(seed)
-  
+
   n <- nrow(X)
   d <- ncol(X)
-  
+
   # Check for even sample size
   if (n %% 2 != 0) {
     stop("Sample size must be even for pair-based methods. Current n = ", n)
   }
-  
+
   # Set threshold using chi-squared distribution
-  threshold <- qchisq(pa, d)
-  
+  # Should be simulation-based threshold like in PWD_ReR:
+
   # Step 1: Create pairs using hierarchical clustering
   dist_mat <- dist(X, method = "euclidean")
   hc_tree <- hclust(dist_mat, method = linkage)
-  
+
   # Extract pairs from hierarchical clustering
   pairs <- list()
   used_indices <- logical(n)
   pair_count <- 0
-  
+
   # Process merges to create pairs
   for (i in 1:nrow(hc_tree$merge)) {
     merge_row <- hc_tree$merge[i, ]
-    
+
     # Get actual indices (negative values indicate original points)
     idx1 <- if (merge_row[1] < 0) abs(merge_row[1]) else NULL
     idx2 <- if (merge_row[2] < 0) abs(merge_row[2]) else NULL
-    
+
     # If both are original points and neither is used
-    if (!is.null(idx1) && !is.null(idx2) && 
+    if (!is.null(idx1) && !is.null(idx2) &&
         !used_indices[idx1] && !used_indices[idx2]) {
       pair_count <- pair_count + 1
       pairs[[pair_count]] <- c(idx1, idx2)
       used_indices[c(idx1, idx2)] <- TRUE
-      
+
       if (pair_count >= n/2) break
     }
   }
-  
+
   # Handle remaining unpaired units with greedy pairing
   remaining <- which(!used_indices)
   if (length(remaining) >= 2) {
@@ -91,25 +91,32 @@ hcm_rer <- function(X, pa = 0.2, n_budget = 1000, linkage = "single", seed = 202
       pairs[[pair_count]] <- remaining[remaining_pairs[[i]]]
     }
   }
-  
+
+  sim_distances <-
+    replicate(500, {
+    allocation_sim <- generate_allocation_from_pairs(pairs, n)
+    maha_dist(X, allocation_sim)
+  })
+
+  threshold <- quantile(sim_distances, pa, na.rm = TRUE)
   # Step 2: Rerandomization within pairs
   best_allocation <- NULL
   best_balance <- Inf
   balance_history <- numeric()
-  
+
   for (iter in 1:n_budget) {
     # Generate allocation from pairs
     allocation <- generate_allocation_from_pairs(pairs, n)
-    
+
     # Calculate balance
     current_balance <- maha_dist(X, allocation)
     balance_history <- c(balance_history, current_balance)
-    
+
     if (current_balance < best_balance) {
       best_allocation <- allocation
       best_balance <- current_balance
     }
-    
+
     # Check if threshold is met
     if (current_balance <= threshold) {
       # Convert pairs to matched pair format
@@ -119,7 +126,7 @@ hcm_rer <- function(X, pa = 0.2, n_budget = 1000, linkage = "single", seed = 202
         if (length(pair_indices) == 2) {
           treatments <- allocation[pair_indices]
           pair_distance <- as.numeric(dist(X[pair_indices, ]))
-          
+
           matched_pairs[[i]] <- list(
             indices = pair_indices,
             treatments = treatments,
@@ -127,7 +134,7 @@ hcm_rer <- function(X, pa = 0.2, n_budget = 1000, linkage = "single", seed = 202
           )
         }
       }
-      
+
       return(list(
         allocation = allocation,
         matched_pairs = matched_pairs,
@@ -142,7 +149,7 @@ hcm_rer <- function(X, pa = 0.2, n_budget = 1000, linkage = "single", seed = 202
       ))
     }
   }
-  
+
   # If no allocation met threshold, return best found
   matched_pairs <- list()
   for (i in 1:length(pairs)) {
@@ -150,7 +157,7 @@ hcm_rer <- function(X, pa = 0.2, n_budget = 1000, linkage = "single", seed = 202
     if (length(pair_indices) == 2) {
       treatments <- best_allocation[pair_indices]
       pair_distance <- as.numeric(dist(X[pair_indices, ]))
-      
+
       matched_pairs[[i]] <- list(
         indices = pair_indices,
         treatments = treatments,
@@ -158,7 +165,7 @@ hcm_rer <- function(X, pa = 0.2, n_budget = 1000, linkage = "single", seed = 202
       )
     }
   }
-  
+
   return(list(
     allocation = best_allocation,
     matched_pairs = matched_pairs,

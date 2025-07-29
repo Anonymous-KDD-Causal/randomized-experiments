@@ -35,10 +35,10 @@ source("R/hcm_rer.R")
 source("R/pwd_rer.R")
 source("R/data_generation.R")
 
-seed = 2000
+seed = 20252025
 
 # Generate synthetic experimental data
-X <- generate_covariates(n = 200, d = 50, rho = 0.2, seed = seed)
+X <- generate_covariates(n = 1000, d = 100, rho = 0.2, seed = seed)
 X <- scale(X)  # Always standardize
 
 # HCM
@@ -96,9 +96,6 @@ results_table <- data.frame(
   Mean_SMD = c(eval_hcm$mean_smd, 
                eval_hcm_rer$mean_smd, 
                eval_pwd_rer$mean_smd),
-  Balance_Score = c(eval_hcm$balance_score, 
-                    eval_hcm_rer$balance_score, 
-                    eval_pwd_rer$balance_score),
   True_Tau = rep(tau_true, 3),
   Estimated_Tau = c(tau_hat_hcm, tau_hat_hcm_rer, tau_hat_pwd_rer),
   Bias = c(tau_hat_hcm - tau_true, 
@@ -118,7 +115,7 @@ cat("=== METHOD RESULTS TABLE ===\n")
 print(results_table, row.names = FALSE)
 
 # Demo results
-#  Method Mahalanobis_Distance Max_SMD Mean_SMD  Balance_Score True_Tau Estimated_Tau    Bias Abs_Bias
-#     HCM              39.1263  0.2758   0.0798           0.72        1        1.0706  0.0706   0.0706
-# HCM-ReR              27.5974  0.2165   0.0613           0.74        1        0.9569 -0.0431   0.0431
-# PWD-ReR              39.7562  0.2981   0.0832           0.60        1        0.7704 -0.2296   0.2296
+#  Method Mahalanobis_Distance Max_SMD Mean_SMD   True_Tau Estimated_Tau    Bias Abs_Bias
+#     HCM             103.5892  0.1579   0.0471          1        0.7690 -0.2310   0.2310
+# HCM-ReR              49.9686  0.1002   0.0336          1        0.9278 -0.0722   0.0722
+# PWD-ReR              69.5217  0.1295   0.0361          1        1.4742  0.4742   0.4742

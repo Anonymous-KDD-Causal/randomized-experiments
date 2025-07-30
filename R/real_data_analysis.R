@@ -1,4 +1,5 @@
 # ============================================================================
+# Hierarchical Clustering Matching and Rerandomization for Causality
 # RANDOMIZATION METHODS COMPARISON ON REAL-WORLD DATA
 # ============================================================================
 
